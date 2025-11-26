@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Visor Faixas – Galicia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Plugins Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.css" />
+
+  <style>
+    /* Reset básico */
+    body, html { height: 100%; width: 100%; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
+    #map { width: 100%; height: 100%; z-index: 1; }
+
+    /* Panel de Título */
+    .title-box {
+        position: absolute; top: 10px; left: 50px; z-index: 1000;
+        background: white; padding: 15px; border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        max-width: 90%; width: auto; min-width: 260px;
+    }
+    .title-box h1 { margin: 0 0 10px 0; font-size: 1.2rem; color: #333; font-weight: 700; }
+
+    /* Ajuste controles Leaflet */
+    .leaflet-top.leaflet-left { top: 130px; left: 0; }
+
+    /* Botón Localización */
+    .locate-prominent-btn {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        width: 100%; padding: 10px 15px; background: #007bff; color: white;
+        border: none; border-radius: 6px; font-size: 1rem; font-weight: 600;
+        cursor: pointer; transition: background 0.2s, transform 0.1s;
+        box-shadow: 0 2px 5px rgba(0,123,255,0.3);
+    }
+    .locate-prominent-btn:hover { background: #0056b3; }
+    .locate-prominent-btn:active { transform: scale(0.98); }
+    .locate-prominent-btn.error { background: #dc3545; }
+    .locate-prominent-btn.success { background: #28a745; }
+
+    /* Botones Flotantes */
+    .floating-btn {
+        background-color: #fff; width: 40px; height: 40px; line-height: 40px;
+        text-align: center; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        cursor: pointer; color: #333; font-size: 18px; transition: transform 0.2s;
+        display: block; margin-top: 10px; text-decoration: none;
+    }
+    .floating-btn:hover { background-color: #f8f9fa; transform: scale(1.05); }
+    .ai-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white !important; border: 2px solid white; }
+
+    /* Ajustes Capas */
+    .leaflet-control-layers-expanded { padding: 12px; font-size: 14px; max-height: 70vh; overflow-y: auto; min-width: 220px; }
+    .leaflet-control-layers label { display: flex !important; align-items: center !important; margin-bottom: 8px !important; width: 100%; }
+    .violet-wms { filter: invert(19%) sepia(96%) saturate(4207%) hue-rotate(277deg) brightness(91%) contrast(109%); }
+    .layer-label { display: flex; align-items: center; gap: 8px; }
+    .color-box { width: 14px; height: 14px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+
+    /* Popup */
+    .info-popup-table td { padding: 3px 8px 3px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+    .info-popup-header { font-weight: bold; color: #007bff; margin-bottom: 5px; border-bottom: 2px solid #007bff; padding-bottom: 3px; }
+
+    /* Modal IA */
+    .ai-modal {
+        display: none; position: fixed; bottom: 80px; right: 10px;
+        width: 350px; max-width: 90vw; background: white; z-index: 2000;
+        border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+        flex-direction: column; overflow: hidden; border: 1px solid #e0e0e0; font-size: 14px;
+    }
+    .ai-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+    .ai-close { cursor: pointer; opacity: 0.8; }
+    .ai-content { height: 300px; overflow-y: auto; padding: 15px; background: #f9f9f9; display: flex; flex-direction: column; gap: 10px; }
+    .message { padding: 8px 12px; border-radius: 8px; max-width: 85%; line-height: 1.4; }
+    .msg-user { background: #e3e8ff; align-self: flex-end; color: #333; border-bottom-right-radius: 0; }
+    .msg-ai { background: white; align-self: flex-start; border: 1px solid #ddd; border-bottom-left-radius: 0; }
+    .ai-input-area { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 8px; background: white; }
+    .ai-input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 12px; outline: none; }
+    .ai-send { background: #764ba2; color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .ai-send:disabled { background: #ccc; cursor: default; }
+    .suggestions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+    .chip { background: #eee; font-size: 0.75rem; padding: 4px 8px; border-radius: 12px; cursor: pointer; color: #555; }
+    .chip:hover { background: #ddd; color: #000; }
+  </style>
+</head>
+<body>
+
+  <div class="title-box">
+      <h1>Visor Faixas</h1>
+      <button id="btnLocateMain" class="locate-prominent-btn">
+        <i class="fa-solid fa-location-crosshairs"></i> Centrar en mi ubicación
+      </button>
+  </div>
+
+  <div id="aiModal" class="ai-modal">
+      <div class="ai-header">
+          <span><i class="fa-solid fa-robot"></i> Asistente Normativa ✨</span>
+          <span class="ai-close" onclick="toggleAI()"><i class="fa-solid fa-xmark"></i></span>
+      </div>
+      <div class="ai-content" id="chatContainer">
+          <div class="message msg-ai">
+              Hola, soy tu asistente experto en la Ley de Prevención de Incendios de Galicia. <br><br>
+              ¿Tienes dudas sobre distancias de plantación?
+              <div class="suggestions">
+                  <span class="chip" onclick="askPreset('Distancia eucaliptos a viviendas')">Distancia eucaliptos</span>
+                  <span class="chip" onclick="askPreset('¿Qué se puede plantar en la faja de 50m?')">Faja 50m</span>
+              </div>
+          </div>
+      </div>
+      <div class="ai-input-area">
+          <input type="text" id="userQuery" class="ai-input" placeholder="Escribe tu duda..." onkeypress="handleEnter(event)">
+          <button id="sendBtn" class="ai-send" onclick="callGemini()"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.js"></script>
+
+  <script>
+    // --- 1. CONFIGURACIÓN DEL MAPA ---
+    var galiciaBounds = L.latLngBounds(L.latLng(41.8, -9.6), L.latLng(43.9, -6.2));
+    var map = L.map('map', {
+        zoomControl: false,
+        maxBounds: galiciaBounds.pad(0.2),
+        minZoom: 7,
+        maxBoundsViscosity: 0.8
+    }).setView([42.88, -8.54], 8);
+
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    // --- 2. HERRAMIENTA DE MEDICIÓN ---
+    var measureControl = new L.Control.Measure({
+        position: 'topleft',
+        primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers',
+        primaryAreaUnit: 'sqmeters', activeColor: '#ff0000',
+        completedColor: '#e74c3c', localization: 'es'
+    });
+    measureControl.addTo(map);
+
+    // Traducción de la interfaz de medición (Observer pattern)
+    function translateMeasureInterface() {
+        const translations = {
+            'Measure distances and areas': 'Medir',
+            'Start creating a measurement by adding points to the map': 'Añade puntos al mapa',
+            'Finish measurement': 'Terminar',
+            'Delete last point': 'Borrar último',
+            'Cancel': 'Cancelar',
+            'Point location': 'Ubicación',
+            'Linear measurement': 'Distancia',
+            'Area measurement': 'Área',
+            'Perimeter': 'Perímetro',
+            'Area': 'Superficie'
+        };
+        const control = document.querySelector('.leaflet-control-measure');
+        if (!control) return;
+        
+        // Traducir title del botón
+        const toggleBtn = control.querySelector('.leaflet-control-measure-toggle');
+        if(toggleBtn) toggleBtn.title = "Herramienta de Medición";
+
+        control.querySelectorAll('h3, a, p, span').forEach(el => {
+            const text = el.innerText.trim();
+            if(translations[text]) el.innerText = translations[text];
+        });
+    }
+    const observer = new MutationObserver(translateMeasureInterface);
+    const measureContainer = document.querySelector('.leaflet-control-measure');
+    if (measureContainer) observer.observe(measureContainer, { childList: true, subtree: true });
+
+    // --- 3. CAPAS ---
+    map.createPane('labelsPane');
+    map.getPane('labelsPane').style.zIndex = 650;
+    map.getPane('labelsPane').style.pointerEvents = 'none';
+
+    var pnoa = L.tileLayer.wms("https://www.ign.es/wms-inspire/pnoa-ma", {
+        layers: "OI.OrthoimageCoverage", format: "image/jpeg", transparent: false,
+        attribution: "© IGN – PNOA", maxZoom: 20
+    }).addTo(map);
+
+    var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: "© OpenStreetMap"
+    });
+
+    var limitesMunicipales = L.tileLayer.wms("https://www.ign.es/wms-inspire/unidades-administrativas", {
+        layers: 'AU.AdministrativeBoundary', format: 'image/png', transparent: true,
+        attribution: "© IGN", zIndex: 1000, className: 'violet-wms'
+    }).addTo(map);
+
+    var poblaciones = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+        attribution: '©OpenStreetMap, ©CartoDB', pane: 'labelsPane', subdomains: 'abcd', maxZoom: 20
+    }).addTo(map);
+
+    var faixa50m = L.esri.dynamicMapLayer({
+        url: "https://ideg.xunta.gal/servizos-c08/rest/services/VISFPI/FaixasProteccionIncendios/MapServer",
+        layers: [2], opacity: 0.65, attribution: "Faixas Xunta", zIndex: 400
+    }).addTo(map);
+
+    var parcelasAfectadas = L.esri.dynamicMapLayer({
+        url: "https://ideg.xunta.gal/servizos-c08/rest/services/VISFPI/FaixasProteccionIncendios/MapServer",
+        layers: [1], opacity: 0.5, zIndex: 390
+    });
+
+    // CAPA CATASTRO (CORREGIDA A HTTPS)
+    var catastro = L.tileLayer.wms("https://ovc.catastro.meh.es/cartografia/INSPIRE/spadgcwms.aspx", {
+        layers: "CP.CadastralParcel", format: 'image/png', transparent: true,
+        attribution: "© Catastro", zIndex: 380, minZoom: 14
+    });
+
+    // MiniMapa
+    var osm2 = new L.TileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom: 0, maxZoom: 13});
+    new L.Control.MiniMap(osm2, { toggleDisplay: true, minimized: false, position: 'bottomleft', width: 120, height: 120 }).addTo(map);
+
+    // Control de Capas
+    var baseMaps = { "🛰️ Satélite": pnoa, "🗺️ Mapa": osm };
+    var overlays = {
+        "<span class='layer-label'><span class='color-box' style='border: 3px solid #9932CC; background:none;'></span> Límites Municipales</span>": limitesMunicipales,
+        "<span class='layer-label'>🏘️ Poblaciones</span>": poblaciones,
+        "<span class='layer-label'><span class='color-box' style='background:rgba(255,0,0,0.5)'></span> Faixa 50m</span>": faixa50m,
+        "<span class='layer-label'><span class='color-box' style='background:rgba(255,165,0,0.5)'></span> Núcleo rural</span>": parcelasAfectadas,
+        "🏗️ Catastro (> Z14)": catastro
+    };
+    L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+    L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(map);
+
+    // --- 4. IDENTIFICACIÓN (POPUP) ---
+    map.on('click', function(e) {
+        if(document.querySelector('.leaflet-control-measure-interaction')) return;
+        
+        L.esri.identifyFeatures({
+            url: 'https://ideg.xunta.gal/servizos-c08/rest/services/VISFPI/FaixasProteccionIncendios/MapServer'
+        }).on(map).at(e.latlng).layers('visible:1,2').run(function(error, featureCollection) {
+            if (featureCollection && featureCollection.features.length > 0) {
+                var popupContent = '';
+                featureCollection.features.forEach(function(feature) {
+                    var props = feature.properties;
+                    var title = (feature.geometry.type === 'Polygon') ? "🌲 Faixa de Gestión" : "Información";
+                    var color = (feature.geometry.type === 'Polygon') ? "#d9534f" : "#333";
+                    
+                    popupContent += `<div class="info-popup-header" style="color:${color}">${title}</div><table class="info-popup-table">`;
+                    for (var key in props) {
+                        if (!['OBJECTID','Shape','SHAPE','Shape.area','Shape.len','pixel'].includes(key)) {
+                            popupContent += `<tr><td><b>${key.replace(/_/g, ' ')}:</b></td><td>${props[key]}</td></tr>`;
+                        }
+                    }
+                    popupContent += '</table><br>';
+                });
+                L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(popupContent).openOn(map);
+            }
+        });
+    });
+
+    // --- 5. GEOLOCALIZACIÓN ---
+    const btnLocateMain = document.getElementById('btnLocateMain');
+    btnLocateMain.addEventListener('click', function(e) {
+        e.preventDefault();
+        // Nota: En iframe, el navegador puede requerir confirmación explícita o bloquear geolocalización
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            // Check laxo para la demo
+        }
+        btnLocateMain.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
+        btnLocateMain.disabled = true;
+        map.locate({ setView: true, maxZoom: 16, enableHighAccuracy: false, timeout: 15000 });
+    });
+
+    map.on('locationfound', function(e) {
+        btnLocateMain.innerHTML = '<i class="fa-solid fa-check"></i> ¡Ubicación!';
+        btnLocateMain.classList.add('success');
+        setTimeout(() => {
+            btnLocateMain.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> Centrar';
+            btnLocateMain.classList.remove('success'); btnLocateMain.disabled = false;
+        }, 3000);
+        L.circle(e.latlng, e.accuracy, { color: '#007bff', fillOpacity: 0.1 }).addTo(map);
+        L.circleMarker(e.latlng, { radius: 6, color: 'white', fillColor: '#007bff', fillOpacity: 1 }).addTo(map);
+    });
+
+    map.on('locationerror', function(e) {
+        // Fallo común en iframes o sin https
+        console.warn(e);
+        btnLocateMain.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Error (Permisos/HTTPS)';
+        btnLocateMain.classList.add('error');
+        setTimeout(() => {
+            btnLocateMain.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> Centrar';
+            btnLocateMain.classList.remove('error'); btnLocateMain.disabled = false;
+        }, 3000);
+    });
+
+    // --- 6. BOTÓN FLOTANTE IA ---
+    var FloatingControls = L.Control.extend({
+        options: { position: 'bottomright' },
+        onAdd: function(map) {
+            var container = L.DomUtil.create('div', '');
+            var aiBtn = L.DomUtil.create('a', 'floating-btn ai-btn', container);
+            aiBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>';
+            aiBtn.href = "#";
+            L.DomEvent.on(aiBtn, 'click', function(e) {
+                e.preventDefault(); e.stopPropagation(); toggleAI();
+            });
+            return container;
+        }
+    });
+    map.addControl(new FloatingControls());
+
+    // --- 7. LÓGICA GEMINI AI ---
+    
+    // <!-- API KEY INTEGRADA -->
+    const apiKey = "AIzaSyCo12EbULqO5ISXNPU1RIDBAROA-HYjWTw"; 
+
+    const chatContainer = document.getElementById('chatContainer');
+    const userQueryInput = document.getElementById('userQuery');
+    const sendBtn = document.getElementById('sendBtn');
+    const aiModal = document.getElementById('aiModal');
+
+    function toggleAI() {
+        if (aiModal.style.display === 'flex') aiModal.style.display = 'none';
+        else { aiModal.style.display = 'flex'; userQueryInput.focus(); }
+    }
+
+    function handleEnter(e) { if (e.key === 'Enter') callGemini(); }
+    function askPreset(text) { userQueryInput.value = text; callGemini(); }
+
+    function appendMessage(text, isUser) {
+        const div = document.createElement('div');
+        div.className = isUser ? 'message msg-user' : 'message msg-ai';
+        div.innerHTML = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+        chatContainer.appendChild(div);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    async function callGemini() {
+        const query = userQueryInput.value.trim();
+        if (!query) return;
+        
+        appendMessage(query, true);
+        userQueryInput.value = ''; userQueryInput.disabled = true; sendBtn.disabled = true;
+        
+        const loadingId = 'loading-' + Date.now();
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = loadingId; loadingDiv.className = 'message msg-ai';
+        loadingDiv.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Pensando...';
+        chatContainer.appendChild(loadingDiv);
+
+        // Prompt de Sistema (Rol del experto)
+        const systemPrompt = "Eres un experto forestal en la Ley 3/2007 de Galicia. Responde brevemente sobre distancias y biomasa. Usa negritas para datos clave. No inventes datos.";
+
+        // Modelo gemini-1.5-flash
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: `Contexto: ${systemPrompt}\n\nUsuario: ${query}` }]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+            document.getElementById(loadingId).remove();
+
+            if (data.error) {
+                appendMessage("⚠️ Error API: " + data.error.message, false);
+            } else {
+                const aiText = data.candidates[0].content.parts[0].text;
+                appendMessage(aiText, false);
+            }
+        } catch (error) {
+            if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+            appendMessage("⚠️ Error de conexión.", false);
+        } finally {
+            userQueryInput.disabled = false; sendBtn.disabled = false; userQueryInput.focus();
+        }
+    }
+  </script>
+</body>
+</html>
